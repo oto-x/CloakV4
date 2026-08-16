@@ -13,7 +13,7 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install Build Dependencies
+    - name: Install System Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y gettext cmake ninja-build
@@ -24,16 +24,29 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK & NDK
+    - name: Setup Android SDK
       uses: android-actions/setup-android@v3
-      with:
-        cmdline-tools-version: 8512546
-        packages: |
-          build-tools;33.0.2
-          platforms;android-33
-          ndk;25.2.9519653
-          cmake;3.22.1
 
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r25c
+        link-to-sdk: true
+
+    - name: Build Debug APK
+      env:
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug --stacktrace
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CloakV4-Debug-APK
+        path: android/app/build/outputs/apk/debug/*.apk
     - name: Build Debug APK
       run: |
         cd android
