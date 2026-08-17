@@ -14,7 +14,7 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - name: Install System Dependencies
+    - name: Install System Build Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y gettext cmake ninja-build build-essential
@@ -34,6 +34,20 @@ jobs:
       with:
         ndk-version: r21e
         link-to-sdk: true
+
+    - name: Build ARM64 Native Binaries & APK
+      env:
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug -PabiFilters=arm64-v8a --stacktrace
+
+    - name: Upload ARM64 APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CloakV4-ARM64-Debug
+        path: android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 
     - name: Build Debug APK
       env:
