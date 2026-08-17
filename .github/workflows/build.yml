@@ -8,15 +8,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout Repository with Submodules
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
 
-    - name: Install System Dependencies
+    - name: Install System Build Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gettext cmake ninja-build
+        sudo apt-get install -y gettext cmake ninja-build build-essential
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -31,9 +32,22 @@ jobs:
       uses: nttld/setup-ndk@v1
       id: setup-ndk
       with:
-        ndk-version: r25c
+        ndk-version: r21e
         link-to-sdk: true
 
+    - name: Build All Native Binaries & APK
+      env:
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug --stacktrace --info
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CloakV4-Debug-APK
+        path: android/app/build/outputs/apk/debug/*.apk
     - name: Build Debug APK
       env:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
