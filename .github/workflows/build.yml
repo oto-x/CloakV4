@@ -49,32 +49,30 @@ jobs:
 
     - name: Patch Native Libraries in APK
       run: |
-        APK_FILE=$(find android/app/build/outputs/apk/debug/ -name "*arm64-v8a*.apk" | head -n 1)
-        if [ -z "$APK_FILE" ]; then
-          APK_FILE=$(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-        fi
+        # Get absolute path to target APK
+        APK_FILE=$(realpath $(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1))
+        echo "Target APK Absolute Path: $APK_FILE"
         
-        echo "Patching APK at $APK_FILE"
+        # Unpack APK
         mkdir -p /tmp/apk_patch
         unzip -q "$APK_FILE" -d /tmp/apk_patch
         
+        # Duplicate .so libraries
         LIB_DIR="/tmp/apk_patch/lib/arm64-v8a"
-        cd "$LIB_DIR"
-        
-        # Duplicate whatever .so is generated to cover all expected loader names
-        if [ -f "libcloakv4.so" ]; then
-          cp libcloakv4.so libluanti.so
-          cp libcloakv4.so libminetest.so
-          cp libcloakv4.so libmain.so
+        if [ -d "$LIB_DIR" ]; then
+          cd "$LIB_DIR"
+          if [ -f "libcloakv4.so" ]; then
+            cp libcloakv4.so libluanti.so
+            cp libcloakv4.so libminetest.so
+            cp libcloakv4.so libmain.so
+          fi
+          echo "Updated binaries in lib/arm64-v8a:"
+          ls -la
         fi
         
-        echo "Final contents of lib/arm64-v8a/:"
-        ls -la
-        
-        # Repackage the APK
+        # Repackage APK directly back to original absolute path
         cd /tmp/apk_patch
-        zip -r -q /tmp/patched.apk .
-        mv /tmp/patched.apk "$APK_FILE"
+        zip -r -q "$APK_FILE" .
 
     - name: Upload ARM64 APK Artifact
       uses: actions/upload-artifact@v4
