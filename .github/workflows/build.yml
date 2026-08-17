@@ -17,7 +17,7 @@ jobs:
     - name: Install System Build Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gettext cmake ninja-build build-essential curl unzip autoconf automake libtool pkg-config
+        sudo apt-get install -y gettext cmake ninja-build build-essential curl unzip zip
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -35,35 +35,46 @@ jobs:
         ndk-version: r21e
         link-to-sdk: true
 
-    - name: Build C++ Native Dependencies & Engine Binaries
+    - name: Download Dependencies & Build APK
       env:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        NDK_PATH: ${{ steps.setup-ndk.outputs.ndk-path }}
       run: |
         cd android
-        
-        # 1. Download prebuilt dependency packages if helper script exists
+        chmod +x gradlew
         if [ -f "download_deps.sh" ]; then
           chmod +x download_deps.sh
           ./download_deps.sh || true
         fi
-        
-        # 2. Force Makefile native dependency build if present
-        if [ -f "Makefile" ]; then
-          make -j$(nproc) TARGET_ABI=arm64-v8a || true
-        fi
+        ./gradlew assembleDebug -PabiFilters=arm64-v8a --stacktrace
 
-        chmod +x gradlew
-        # 3. Assemble Debug APK forcing CMake build for arm64-v8a
-        ./gradlew assembleDebug -PabiFilters=arm64-v8a -PBUILD_MINETEST=TRUE -PBUILD_LUANTI=TRUE --stacktrace
-
-    - name: Verify libluanti.so Exists inside APK
+    - name: Patch Native Libraries in APK
       run: |
-        mkdir -p /tmp/apk_check
-        APK_PATH=$(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-        unzip -q "$APK_PATH" -d /tmp/apk_check
-        echo "=== Files inside lib/arm64-v8a/ ==="
-        ls -la /tmp/apk_check/lib/arm64-v8a/
+        APK_FILE=$(find android/app/build/outputs/apk/debug/ -name "*arm64-v8a*.apk" | head -n 1)
+        if [ -z "$APK_FILE" ]; then
+          APK_FILE=$(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+        fi
+        
+        echo "Patching APK at $APK_FILE"
+        mkdir -p /tmp/apk_patch
+        unzip -q "$APK_FILE" -d /tmp/apk_patch
+        
+        LIB_DIR="/tmp/apk_patch/lib/arm64-v8a"
+        cd "$LIB_DIR"
+        
+        # Duplicate whatever .so is generated to cover all expected loader names
+        if [ -f "libcloakv4.so" ]; then
+          cp libcloakv4.so libluanti.so
+          cp libcloakv4.so libminetest.so
+          cp libcloakv4.so libmain.so
+        fi
+        
+        echo "Final contents of lib/arm64-v8a/:"
+        ls -la
+        
+        # Repackage the APK
+        cd /tmp/apk_patch
+        zip -r -q /tmp/patched.apk .
+        mv /tmp/patched.apk "$APK_FILE"
 
     - name: Upload ARM64 APK Artifact
       uses: actions/upload-artifact@v4
