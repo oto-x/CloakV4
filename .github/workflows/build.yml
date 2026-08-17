@@ -35,20 +35,20 @@ jobs:
         ndk-version: r25c
         link-to-sdk: true
 
-    - name: Download & Extract Pre-built C++ Native Deps
+    - name: Download Native C++ Dependencies
       run: |
-        mkdir -p android/native/deps
+        mkdir -p android/deps
         curl -L -o deps.zip https://github.com/luanti-org/luanti_android_deps/releases/download/latest/deps-lite.zip
-        unzip -q deps.zip -d android/native/deps
+        unzip -q deps.zip -d android/deps
         rm deps.zip
 
-    - name: Build ARM64 Native Engine & APK
+    - name: Build C++ Native Binaries & APK
       env:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
       run: |
         cd android
         chmod +x gradlew
-        ./gradlew :native:buildCMakeDebug[arm64-v8a] assembleDebug -PabiFilters=arm64-v8a --stacktrace
+        ./gradlew assembleDebug -PabiFilters=arm64-v8a -PBUILD_Luanti=TRUE --stacktrace
 
     - name: Upload ARM64 APK Artifact
       uses: actions/upload-artifact@v4
