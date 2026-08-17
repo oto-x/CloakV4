@@ -46,6 +46,21 @@ jobs:
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
+        name: CloakV4-Debug-APK-${{ github.run_id }}-${{ github.run_attempt }}
+        path: android/app/build/outputs/apk/debug/*.apk
+        overwrite: true
+
+    - name: Build All Native Binaries & APK
+      env:
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug --stacktrace --info
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
         name: CloakV4-Debug-APK
         path: android/app/build/outputs/apk/debug/*.apk
         overwrite: true
