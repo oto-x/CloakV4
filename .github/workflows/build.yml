@@ -32,26 +32,33 @@ jobs:
       uses: nttld/setup-ndk@v1
       id: setup-ndk
       with:
-        ndk-version: r25c
+        ndk-version: r21e
         link-to-sdk: true
 
-    - name: Download Native C++ Dependencies
-      run: |
-        mkdir -p android/deps
-        curl -L -o deps.zip https://github.com/luanti-org/luanti_android_deps/releases/download/latest/deps-lite.zip
-        unzip -q deps.zip -d android/deps
-        rm deps.zip
-
-    - name: Build C++ Native Binaries & APK
+    - name: Download Native Dependencies & Build APK
       env:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
       run: |
         cd android
         chmod +x gradlew
-        ./gradlew assembleDebug -PabiFilters=arm64-v8a -PBUILD_Luanti=TRUE --stacktrace
+        if [ -f "download_deps.sh" ]; then
+          chmod +x download_deps.sh
+          ./download_deps.sh || true
+        fi
+        ./gradlew assembleDebug -PabiFilters=arm64-v8a --stacktrace
+
+    - name: Verify Native Library Built
+      run: |
+        mkdir -p /tmp/apk_check
+        unzip -q android/app/build/outputs/apk/debug/*.apk -d /tmp/apk_check
+        if [ ! -f /tmp/apk_check/lib/arm64-v8a/libluanti.so ]; then
+          echo "ERROR: libluanti.so is missing from APK!"
+          exit 1
+        fi
+        echo "SUCCESS: libluanti.so verified inside APK."
 
     - name: Upload ARM64 APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: CloakV4-ARM64-Debug
-        path: android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+        path: android/app/build/outputs/apk/debug/*.apk
